@@ -6,6 +6,11 @@ import Dashboard from "./pages/Dashboard";
 import CreateQuiz from "./pages/CreateQuiz";
 import Game from "./pages/Game";
 import Results from "./pages/Results";
+import QuestionType from "./pages/QuestionType";
+import AddQuestion from "./pages/AddQuestion";
+import QuizEdit from "./pages/QuizEdit";
+import PrivateRoute from "./components/PrivateRoute";
+import EditQuestion from "./pages/EditQuestion";
 
 function App() {
   return (
@@ -17,14 +22,41 @@ function App() {
         <Route path="/login" element={<Login />} />
 
         <Route path="/register" element={<Register />} />
+<Route 
+  path="/dashboard"
+  element={
+    <PrivateRoute>
+      <Dashboard />
+    </PrivateRoute>
+  }
+/>
 
-        <Route path="/dashboard" element={<Dashboard />} />
+<Route
+ path="/create-quiz"
+ element={
+   <PrivateRoute>
+     <CreateQuiz />
+   </PrivateRoute>
+ }
+/>
+        <Route path="/game" element={<PrivateRoute><Game /></PrivateRoute>} />
 
-        <Route path="/create-quiz" element={<CreateQuiz />} />
+        <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
 
-        <Route path="/game" element={<Game />} />
+        <Route path="/question-type" element={<PrivateRoute><QuestionType /></PrivateRoute>} />
 
-        <Route path="/results" element={<Results />} />
+        <Route path="/add-question" element={<PrivateRoute><AddQuestion /></PrivateRoute>} />
+
+        <Route path="/quiz/:id" element={<PrivateRoute><QuizEdit /></PrivateRoute>} />
+
+<Route
+ path="/edit-question/:id"
+ element={
+   <PrivateRoute>
+     <EditQuestion />
+   </PrivateRoute>
+ }
+/>
 
       </Routes>
     </BrowserRouter>

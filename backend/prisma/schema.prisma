@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("PLAYER")
+  createdAt DateTime @default(now())
+
+  quizzes   Quiz[]
+}
+
+
+model Quiz {
+  id          Int      @id @default(autoincrement())
+  title       String
+  category    String
+  rules       String?
+  timePerQuestion Int
+
+  creatorId Int
+  creator   User @relation(fields: [creatorId], references: [id])
+
+  questions Question[]
+}
+
+
+model Question {
+  id      Int    @id @default(autoincrement())
+  text    String
+  type    String
+
+  quizId Int
+  quiz   Quiz @relation(fields: [quizId], references: [id])
+
+  answers Answer[]
+}
+
+
+model Answer {
+  id        Int     @id @default(autoincrement())
+  text      String
+  isCorrect Boolean @default(false)
+
+  questionId Int
+  question Question @relation(fields: [questionId], references: [id])
+}
