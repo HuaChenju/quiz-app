@@ -2,53 +2,57 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/prisma");
 
+const allowedRoles = ["PLAYER", "ORGANIZER"];
 
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-
-    const existingUser = await prisma.user.findUnique({
-      where: {
-        email
-      }
-    });
-
-
-    if (existingUser) {
+    if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
-        message: "User already exists"
+        message: "Заполните имя, email и пароль",
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const selectedRole = allowedRoles.includes(role) ? role : "PLAYER";
+
+    const existingUser = await prisma.user.findUnique({
+      where: {
+        email: normalizedEmail,
+      },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        message: "Пользователь с таким email уже существует",
+      });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-
     const user = await prisma.user.create({
       data: {
-        name,
-        email,
+        name: name.trim(),
+        email: normalizedEmail,
         password: hashedPassword,
-        role: role || "PLAYER"
-      }
+        role: selectedRole,
+      },
     });
 
-
-    res.json({
-      message: "User created",
+    return res.status(201).json({
+      message: "Пользователь создан",
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
-
-
   } catch (error) {
-    res.status(500).json({
-      error: error.message
+    return res.status(500).json({
+      message: "Не удалось зарегистрироваться",
+      error: error.message,
     });
   }
 };
@@ -57,64 +61,63 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    if (!email?.trim() || !password) {
+      return res.status(400).json({
+        message: "Введите email и пароль",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
 
     const user = await prisma.user.findUnique({
       where: {
-        email
-      }
+        email: normalizedEmail,
+      },
     });
-
 
     if (!user) {
       return res.status(404).json({
-        message: "User not found"
+        message: "Пользователь не найден",
       });
     }
 
-
-    const validPassword = await bcrypt.compare(
-      password,
-      user.password
-    );
-
+    const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
       return res.status(400).json({
-        message: "Wrong password"
+        message: "Неверный пароль",
       });
     }
 
-
     const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1d"
-      }
+        {
+          id: user.id,
+          role: user.role,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "1d",
+        }
     );
 
-
-    res.json({
+    return res.json({
       token,
       user: {
         id: user.id,
         name: user.name,
-        role: user.role
-      }
+        email: user.email,
+        role: user.role,
+      },
     });
-
-
   } catch (error) {
-    res.status(500).json({
-      error: error.message
+    return res.status(500).json({
+      message: "Не удалось войти",
+      error: error.message,
     });
   }
 };
 
 module.exports = {
   register,
-  login
+  login,
 };
