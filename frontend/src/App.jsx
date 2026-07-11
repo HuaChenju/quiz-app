@@ -11,6 +11,9 @@ import AddQuestion from "./pages/AddQuestion";
 import QuizEdit from "./pages/QuizEdit";
 import PrivateRoute from "./components/PrivateRoute";
 import EditQuestion from "./pages/EditQuestion";
+import Room from "./pages/Room";
+import JoinRoom from "./pages/JoinRoom";
+
 
 function App() {
   return (
@@ -39,14 +42,27 @@ function App() {
    </PrivateRoute>
  }
 />
-        <Route path="/game" element={<PrivateRoute><Game /></PrivateRoute>} />
+        <Route
+  path="/game/:id"
+  element={
+    <PrivateRoute>
+      <Game />
+    </PrivateRoute>
+  }
+/>
 
         <Route path="/results" element={<PrivateRoute><Results /></PrivateRoute>} />
 
         <Route path="/question-type" element={<PrivateRoute><QuestionType /></PrivateRoute>} />
 
-        <Route path="/add-question" element={<PrivateRoute><AddQuestion /></PrivateRoute>} />
-
+          <Route
+              path="/quiz/:quizId/add-question"
+              element={
+                  <PrivateRoute>
+                      <AddQuestion />
+                  </PrivateRoute>
+              }
+          />
         <Route path="/quiz/:id" element={<PrivateRoute><QuizEdit /></PrivateRoute>} />
 
 <Route
@@ -56,6 +72,24 @@ function App() {
      <EditQuestion />
    </PrivateRoute>
  }
+/>
+
+<Route
+  path="/room"
+  element={
+    <PrivateRoute>
+      <Room />
+    </PrivateRoute>
+  }
+/>
+
+<Route
+  path="/join-room"
+  element={
+    <PrivateRoute>
+      <JoinRoom />
+    </PrivateRoute>
+  }
 />
 
       </Routes>

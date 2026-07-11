@@ -34,6 +34,17 @@ model Quiz {
   creator   User @relation(fields: [creatorId], references: [id])
 
   questions Question[]
+  rooms Room[]
+}
+
+model Room {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  status    String   @default("WAITING")
+  createdAt DateTime @default(now())
+
+  quizId Int
+  quiz   Quiz @relation(fields: [quizId], references: [id])
 }
 
 

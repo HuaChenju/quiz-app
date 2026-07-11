@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-
+import { useNavigate, useParams } from "react-router-dom";
 
 function AddQuestion() {
 
   const navigate = useNavigate();
-
+  const { quizId } = useParams();
 
   const type =
     localStorage.getItem("answerType") || "single";
@@ -83,8 +82,6 @@ function AddQuestion() {
 const saveQuestion = async () => {
 
   const token = localStorage.getItem("token");
-
-  const quizId = localStorage.getItem("quizId");
 
 
   const response = await fetch(

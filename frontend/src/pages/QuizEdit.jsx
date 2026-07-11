@@ -32,7 +32,35 @@ function QuizEdit() {
 
   };
 
+const deleteQuestion = async (questionId) => {
 
+  const confirmed = window.confirm(
+    "Удалить этот вопрос?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(
+    `http://localhost:5000/api/quizzes/questions/${questionId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  if (response.ok) {
+    await loadQuiz();
+  } else {
+    alert("Не удалось удалить вопрос");
+  }
+
+};
 
   useEffect(() => {
 
@@ -133,6 +161,14 @@ function QuizEdit() {
                   Редактировать
                 </button>
 
+                {" "}
+
+                <button
+                  onClick={() => deleteQuestion(question.id)}
+                >
+                  Удалить
+                </button>
+
 
                 <br />
                 <br />
@@ -148,9 +184,9 @@ function QuizEdit() {
 
 
         <button
-          onClick={() =>
-            navigate("/add-question")
-          }
+            onClick={() =>
+                navigate(`/quiz/${id}/add-question`)
+            }
         >
           Добавить вопрос
         </button>
