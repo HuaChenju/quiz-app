@@ -7,6 +7,7 @@ const { Server } = require("socket.io");
 
 const authRoutes = require("./routes/authRoutes");
 const quizRoutes = require("./routes/quizRoutes");
+const historyRoutes = require("./routes/historyRoutes");
 const prisma = require("./config/prisma");
 
 const app = express();
@@ -16,6 +17,7 @@ app.use(express.json());
 
 app.use("/auth", authRoutes);
 app.use("/api/quizzes", quizRoutes);
+app.use("/api/history", historyRoutes);
 
 app.get("/", (req, res) => {
     res.json({

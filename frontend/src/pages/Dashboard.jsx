@@ -5,8 +5,12 @@ function Dashboard() {
     const navigate = useNavigate();
 
     const [quizzes, setQuizzes] = useState([]);
+    const [history, setHistory] = useState([]);
+
     const [error, setError] = useState("");
+
     const [isLoading, setIsLoading] = useState(true);
+    const [historyLoading, setHistoryLoading] = useState(true);
 
     const user = JSON.parse(localStorage.getItem("user") || "null");
     const isOrganizer = user?.role === "ORGANIZER";
@@ -48,6 +52,35 @@ function Dashboard() {
             setError("Сервер недоступен");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const loadHistory = async () => {
+        const token = localStorage.getItem("token");
+
+        const url = isOrganizer
+            ? "http://localhost:5000/api/history/organizer"
+            : "http://localhost:5000/api/history/player";
+
+        try {
+            const response = await fetch(url, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setError(data.message || "Не удалось загрузить историю");
+                return;
+            }
+
+            setHistory(data);
+        } catch {
+            setError("Не удалось загрузить историю");
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -110,6 +143,7 @@ function Dashboard() {
 
     useEffect(() => {
         loadQuizzes();
+        loadHistory();
     }, []);
 
     return (
@@ -174,6 +208,50 @@ function Dashboard() {
                             ))
                         )}
 
+                        <h2>История проведённых квизов</h2>
+
+                        {historyLoading ? (
+                            <p>Загрузка...</p>
+                        ) : history.length === 0 ? (
+                            <p>История пока пустая</p>
+                        ) : (
+                            history.map((item) => (
+                                <div key={item.sessionId}>
+                                    <strong>{item.quizTitle}</strong>
+
+                                    <p>Категория: {item.category}</p>
+
+                                    <p>
+                                        Дата:{" "}
+                                        {item.finishedAt
+                                            ? new Date(item.finishedAt).toLocaleString()
+                                            : "Квиз ещё не завершён"}
+                                    </p>
+
+                                    <p>
+                                        Участников: {item.participants}
+                                    </p>
+
+                                    <p>
+                                        Победитель: {item.winner || "-"}
+                                    </p>
+
+                                    <button
+                                        onClick={() =>
+                                            navigate(`/session/${item.sessionId}`)
+                                        }
+                                    >
+                                        Подробнее
+                                    </button>
+
+                                    <br />
+                                    <br />
+
+                                    <hr />
+                                </div>
+                            ))
+                        )}
+
                         <button onClick={() => navigate("/create-quiz")}>
                             Создать квиз
                         </button>
@@ -188,6 +266,40 @@ function Dashboard() {
                         <button onClick={() => navigate("/join-room")}>
                             Подключиться к комнате
                         </button>
+
+
+                        <h2>История участия</h2>
+
+                        {historyLoading ? (
+                            <p>Загрузка...</p>
+                        ) : history.length === 0 ? (
+                            <p>История пока пустая</p>
+                        ) : (
+                            history.map((item) => (
+                                <div key={item.sessionId}>
+                                    <strong>{item.quizTitle}</strong>
+
+                                    <p>Категория: {item.category}</p>
+
+                                    <p>
+                                        Дата:{" "}
+                                        {item.finishedAt
+                                            ? new Date(item.finishedAt).toLocaleString()
+                                            : "Квиз ещё не завершён"}
+                                    </p>
+
+                                    <p>
+                                        Баллы: {item.score}/{item.totalQuestions}
+                                    </p>
+
+                                    <p>
+                                        Место: {item.place}
+                                    </p>
+
+                                    <hr />
+                                </div>
+                            ))
+                        )}
 
                         <br />
                         <br />

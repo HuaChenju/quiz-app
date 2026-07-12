@@ -13,6 +13,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import EditQuestion from "./pages/EditQuestion";
 import Room from "./pages/Room";
 import JoinRoom from "./pages/JoinRoom";
+import SessionDetails from "./pages/SessionDetails";
 
 
 function App() {
@@ -33,6 +34,15 @@ function App() {
     </PrivateRoute>
   }
 />
+
+          <Route
+              path="/session/:sessionId"
+              element={
+                  <PrivateRoute>
+                      <SessionDetails />
+                  </PrivateRoute>
+              }
+          />
 
 <Route
  path="/create-quiz"
