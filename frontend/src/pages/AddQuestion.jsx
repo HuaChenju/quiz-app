@@ -9,6 +9,7 @@ function AddQuestion() {
       localStorage.getItem("answerType") || "single";
 
   const [question, setQuestion] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -116,6 +117,7 @@ function AddQuestion() {
             body: JSON.stringify({
               text: question,
               type,
+              imageUrl,
               answers: answers.map((answer) => ({
                 text: answer.text,
                 isCorrect: answer.correct,
@@ -158,6 +160,38 @@ function AddQuestion() {
                 setError("");
               }}
           />
+
+          <p>Ссылка на изображение</p>
+
+          <input
+              placeholder="https://example.com/image.jpg"
+              value={imageUrl}
+              onChange={(event) =>
+                  setImageUrl(event.target.value)
+              }
+          />
+
+          {imageUrl && (
+              <div>
+                <p>Предпросмотр</p>
+
+                <img
+                    src={imageUrl}
+                    alt="Предпросмотр вопроса"
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "300px",
+                      objectFit: "contain",
+                    }}
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
+                    onLoad={(event) => {
+                      event.currentTarget.style.display = "block";
+                    }}
+                />
+              </div>
+          )}
 
           <p>Ответы</p>
 

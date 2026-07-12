@@ -7,6 +7,7 @@ const { Server } = require("socket.io");
 
 const authRoutes = require("./routes/authRoutes");
 const quizRoutes = require("./routes/quizRoutes");
+const prisma = require("./config/prisma");
 
 const app = express();
 
@@ -128,80 +129,180 @@ io.on("connection", (socket) => {
         );
     });
 
-
-    socket.on("submit-result", ({ score, totalQuestions }) => {
-        if (!socket.roomCode || !socket.userId) {
-            socket.emit(
-                "result-error",
-                "Вы не подключены к комнате"
-            );
-            return;
-        }
-
-        const room = rooms[socket.roomCode];
-
-        if (!room) {
-            socket.emit(
-                "result-error",
-                "Комната не найдена"
-            );
-            return;
-        }
-
-        const player = room.players.find(
-            (currentPlayer) =>
-                currentPlayer.id === socket.userId
-        );
-
-        if (!player) {
-            socket.emit(
-                "result-error",
-                "Участник не найден"
-            );
-            return;
-        }
-
-        if (!room.results) {
-            room.results = {};
-        }
-
-        room.results[socket.userId] = {
-            userId: socket.userId,
-            name: player.name,
-            score: Number(score) || 0,
-            totalQuestions: Number(totalQuestions) || 0
-        };
-
-        const leaderboard = Object.values(room.results)
-            .sort((firstPlayer, secondPlayer) => {
-                if (secondPlayer.score !== firstPlayer.score) {
-                    return secondPlayer.score - firstPlayer.score;
-                }
-
-                return firstPlayer.name.localeCompare(
-                    secondPlayer.name
+    socket.on("submit-result", async ({ score, totalQuestions }) => {
+        try {
+            if (!socket.roomCode || !socket.userId) {
+                socket.emit(
+                    "result-error",
+                    "Вы не подключены к комнате"
                 );
-            })
-            .map((result, index) => ({
-                ...result,
-                place: index + 1
-            }));
+                return;
+            }
 
-        socket.emit("result-submitted", {
-            leaderboard,
-            submittedPlayers: leaderboard.length,
-            totalPlayers: room.players.length
-        });
+            const room = rooms[socket.roomCode];
 
-        if (
-            leaderboard.length >= room.players.length
-        ) {
-            io.to(socket.roomCode).emit(
-                "leaderboard-ready",
-                leaderboard
+            if (!room) {
+                socket.emit(
+                    "result-error",
+                    "Комната не найдена"
+                );
+                return;
+            }
+
+            const player = room.players.find(
+                (currentPlayer) =>
+                    currentPlayer.id === socket.userId
+            );
+
+            if (!player) {
+                socket.emit(
+                    "result-error",
+                    "Участник не найден"
+                );
+                return;
+            }
+
+            if (!room.sessionId) {
+                socket.emit(
+                    "result-error",
+                    "Игровая сессия не найдена"
+                );
+                return;
+            }
+
+            const normalizedScore = Number(score) || 0;
+            const normalizedTotalQuestions =
+                Number(totalQuestions) || 0;
+
+            await prisma.sessionResult.upsert({
+                where: {
+                    sessionId_userId: {
+                        sessionId: room.sessionId,
+                        userId: socket.userId
+                    }
+                },
+                update: {
+                    score: normalizedScore,
+                    totalQuestions: normalizedTotalQuestions
+                },
+                create: {
+                    sessionId: room.sessionId,
+                    userId: socket.userId,
+                    score: normalizedScore,
+                    totalQuestions: normalizedTotalQuestions,
+                    place: 0
+                }
+            });
+
+            const savedResults =
+                await prisma.sessionResult.findMany({
+                    where: {
+                        sessionId: room.sessionId
+                    },
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        }
+                    }
+                });
+
+            const leaderboard = savedResults
+                .map((result) => ({
+                    userId: result.userId,
+                    name: result.user.name,
+                    score: result.score,
+                    totalQuestions: result.totalQuestions
+                }))
+                .sort((firstPlayer, secondPlayer) => {
+                    if (
+                        secondPlayer.score !== firstPlayer.score
+                    ) {
+                        return (
+                            secondPlayer.score -
+                            firstPlayer.score
+                        );
+                    }
+
+                    return firstPlayer.name.localeCompare(
+                        secondPlayer.name
+                    );
+                })
+                .map((result, index) => ({
+                    ...result,
+                    place: index + 1
+                }));
+
+            if (!room.results) {
+                room.results = {};
+            }
+
+            leaderboard.forEach((result) => {
+                room.results[result.userId] = result;
+            });
+
+            socket.emit("result-submitted", {
+                leaderboard,
+                submittedPlayers: leaderboard.length,
+                totalPlayers: room.players.length
+            });
+
+            if (
+                leaderboard.length >= room.players.length
+            ) {
+                await Promise.all(
+                    leaderboard.map((result) =>
+                        prisma.sessionResult.updateMany({
+                            where: {
+                                sessionId: room.sessionId,
+                                userId: result.userId
+                            },
+                            data: {
+                                place: result.place
+                            }
+                        })
+                    )
+                );
+
+                await prisma.quizSession.updateMany({
+                    where: {
+                        id: room.sessionId
+                    },
+                    data: {
+                        status: "FINISHED",
+                        finishedAt: new Date()
+                    }
+                });
+
+                await prisma.room.updateMany({
+                    where: {
+                        code: socket.roomCode
+                    },
+                    data: {
+                        status: "FINISHED"
+                    }
+                });
+
+                io.to(socket.roomCode).emit(
+                    "leaderboard-ready",
+                    leaderboard
+                );
+            }
+        } catch (error) {
+            console.error(
+                "Result saving error:",
+                error
+            );
+
+            socket.emit(
+                "result-error",
+                "Не удалось сохранить результат"
             );
         }
     });
+
 
     socket.on("get-leaderboard", () => {
         if (!socket.roomCode) {

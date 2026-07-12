@@ -131,6 +131,18 @@ const deleteQuestion = async (questionId) => {
                   {index + 1}. {question.text}
                 </h3>
 
+                {question.imageUrl && (
+                    <img
+                        src={question.imageUrl}
+                        alt={question.text}
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "250px",
+                          objectFit: "contain",
+                          marginBottom: "16px",
+                        }}
+                    />
+                )}
 
 
                 {

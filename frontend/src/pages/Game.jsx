@@ -256,6 +256,19 @@ function Game() {
 
           <h2>{question.text}</h2>
 
+          {question.imageUrl && (
+              <img
+                  src={question.imageUrl}
+                  alt={question.text}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "320px",
+                    objectFit: "contain",
+                    marginBottom: "20px",
+                  }}
+              />
+          )}
+
           {question.answers.map((answer) => (
               <button
                   key={answer.id}

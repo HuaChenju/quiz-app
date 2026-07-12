@@ -98,7 +98,8 @@ exports.addQuestion = async (req, res) => {
         const {
             text,
             type,
-            answers
+            answers,
+            imageUrl
         } = req.body;
 
         if (!Number.isInteger(quizId)) {
@@ -178,10 +179,13 @@ exports.addQuestion = async (req, res) => {
             });
         }
 
+        const normalizedImageUrl = imageUrl?.trim() || null;
+
         const question = await prisma.question.create({
             data: {
                 text: normalizedText,
                 type,
+                imageUrl: normalizedImageUrl,
                 quizId,
                 answers: {
                     create: normalizedAnswers
@@ -245,7 +249,8 @@ exports.updateQuestion = async (req, res) => {
         const {
             text,
             type,
-            answers
+            answers,
+            imageUrl
         } = req.body;
 
         if (!Number.isInteger(questionId)) {
@@ -341,6 +346,8 @@ exports.updateQuestion = async (req, res) => {
             }
         });
 
+        const normalizedImageUrl = imageUrl?.trim() || null;
+
         const question = await prisma.question.update({
             where: {
                 id: questionId
@@ -348,6 +355,7 @@ exports.updateQuestion = async (req, res) => {
             data: {
                 text: normalizedText,
                 type: normalizedType,
+                imageUrl: normalizedImageUrl,
                 answers: {
                     create: normalizedAnswers
                 }
@@ -554,17 +562,33 @@ exports.createRoom = async (req, res) => {
             }
         });
 
+        const session = await prisma.quizSession.create({
+            data: {
+                roomCode: code,
+                quizId,
+                organizerId: req.user.id,
+                status: "ACTIVE"
+            }
+        });
+
         const rooms = req.app.get("rooms");
 
         rooms[code] = {
             players: [],
             quizId,
             ownerId: req.user.id,
+            sessionId: session.id,
             started: false,
-            currentQuestion: 0
+            currentQuestion: 0,
+            results: {}
         };
 
-        return res.status(201).json(room);
+        return res.status(201).json({
+            ...room,
+            sessionId: session.id
+        });
+
+
     } catch (error) {
         return res.status(500).json({
             message: "Не удалось создать комнату",
