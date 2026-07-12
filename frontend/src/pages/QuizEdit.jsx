@@ -191,6 +191,15 @@ const deleteQuestion = async (questionId) => {
           Добавить вопрос
         </button>
 
+        <br />
+        <br />
+
+        <button
+            onClick={() => navigate("/dashboard")}
+        >
+          Назад к списку квизов
+        </button>
+
 
 
       </div>

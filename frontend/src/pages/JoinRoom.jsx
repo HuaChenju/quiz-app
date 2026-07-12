@@ -2,51 +2,58 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function JoinRoom() {
-
   const navigate = useNavigate();
 
   const [code, setCode] = useState("");
+  const [error, setError] = useState("");
 
   const joinRoom = () => {
+    const normalizedCode = code.trim().toUpperCase();
+
+    if (!normalizedCode) {
+      setError("Введите код комнаты");
+      return;
+    }
 
     navigate("/room", {
       state: {
-        code,
-        quizId: null
-      }
+        code: normalizedCode,
+        quizId: null,
+        isHost: false,
+      },
     });
-
   };
 
   return (
+      <div className="page">
+        <div className="card">
+          <h1>Подключиться</h1>
 
-    <div className="page">
+          <input
+              value={code}
+              placeholder="Код комнаты"
+              maxLength={6}
+              onChange={(event) => {
+                setCode(event.target.value.toUpperCase());
+                setError("");
+              }}
+          />
 
-      <div className="card">
+          {error && <p>{error}</p>}
 
-        <h1>Подключиться</h1>
+          <button onClick={joinRoom}>
+            Войти
+          </button>
 
-        <input
-          value={code}
-          onChange={(e) =>
-            setCode(
-              e.target.value.toUpperCase()
-            )
-          }
-        />
+          <br />
+          <br />
 
-        <button
-          onClick={joinRoom}
-        >
-          Войти
-        </button>
-
+          <button onClick={() => navigate("/dashboard")}>
+            Назад
+          </button>
+        </div>
       </div>
-
-    </div>
-
   );
-
 }
 
 export default JoinRoom;

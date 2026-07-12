@@ -1,279 +1,293 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import socket from "../socket";
 
 function Game() {
-
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const [quiz, setQuiz] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState([]);
   const [results, setResults] = useState([]);
-  const [started, setStarted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [error, setError] = useState("");
 
-  const loadQuiz = async () => {
+  const selectedAnswersRef = useRef([]);
+  const resultsRef = useRef([]);
+  const currentQuestionRef = useRef(0);
+  const quizRef = useRef(null);
 
-    const token = localStorage.getItem("token");
+  const savedRoom = JSON.parse(
+      sessionStorage.getItem("activeRoom") || "null"
+  );
 
-    const response = await fetch(
-      `http://localhost:5000/api/quizzes/${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
-
-    const data = await response.json();
-
-    setQuiz(data);
-
-  };
+  const isHost =
+      location.state?.isHost === true ||
+      savedRoom?.isHost === true;
 
   useEffect(() => {
-
- socket.on("question-changed", ({ currentQuestion }) => {
-
-    setCurrentQuestion(currentQuestion);
-    setSelectedAnswers([]);
-    setTimeLeft(quiz?.timePerQuestion ?? 0);
-
-});
-
-  return () => {
-
-    socket.off("question-changed");
-
-  };
-
-}, [quiz]);
+    selectedAnswersRef.current = selectedAnswers;
+  }, [selectedAnswers]);
 
   useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
 
-    const fetchQuiz = async () => {
-      await loadQuiz();
-    };
+  useEffect(() => {
+    currentQuestionRef.current = currentQuestion;
+  }, [currentQuestion]);
 
-    fetchQuiz();
+  useEffect(() => {
+    quizRef.current = quiz;
+  }, [quiz]);
 
-  }, [id]);
+  useEffect(() => {
+    const loadQuiz = async () => {
+      const token = localStorage.getItem("token");
 
-  const question = quiz?.questions[currentQuestion];
-
-  const handleAnswerClick = (answerId) => {
-
-    if (question.type === "single") {
-
-      setSelectedAnswers([answerId]);
-
-    } else {
-
-      if (selectedAnswers.includes(answerId)) {
-
-        setSelectedAnswers(
-          selectedAnswers.filter(id => id !== answerId)
+      try {
+        const response = await fetch(
+            `http://localhost:5000/api/quizzes/${id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
         );
 
-      } else {
+        const data = await response.json();
 
-        setSelectedAnswers([
-          ...selectedAnswers,
-          answerId
-        ]);
-
-      }
-
-    }
-
-  };
-
-  const nextQuestion = () => {
-    socket.emit("next-question");
-    const newResults = [
-      ...results,
-      {
-        questionId: question.id,
-        selectedAnswers
-      }
-    ];
-
-    setResults(newResults);
-
-    if (currentQuestion < quiz.questions.length - 1) {
-
-      setCurrentQuestion(prev => prev + 1);
-      setSelectedAnswers([]);
-      setTimeLeft(quiz.timePerQuestion);
-
-    } else {
-
-      navigate("/results", {
-        state: {
-          quiz,
-          answers: newResults
+        if (!response.ok) {
+          setError(data.message || "Не удалось загрузить квиз");
+          return;
         }
-      });
 
-    }
+        setQuiz(data);
+        setTimeLeft(data.timePerQuestion);
+      } catch {
+        setError("Сервер недоступен");
+      }
+    };
 
-  };
+    loadQuiz();
+  }, [id]);
 
   useEffect(() => {
+    const handleQuestionChanged = ({ currentQuestion: nextIndex }) => {
+      const currentQuiz = quizRef.current;
 
-    if (!started || !quiz) {
+      if (!currentQuiz) {
+        return;
+      }
+
+      const currentQuestionData =
+          currentQuiz.questions[currentQuestionRef.current];
+
+      let updatedResults = resultsRef.current;
+
+      if (currentQuestionData) {
+        const existingResult = updatedResults.find(
+            (result) =>
+                result.questionId === currentQuestionData.id
+        );
+
+        if (!existingResult) {
+          updatedResults = [
+            ...updatedResults,
+            {
+              questionId: currentQuestionData.id,
+              selectedAnswers: selectedAnswersRef.current,
+            },
+          ];
+
+          setResults(updatedResults);
+          resultsRef.current = updatedResults;
+        }
+      }
+
+      if (nextIndex >= currentQuiz.questions.length) {
+        navigate("/results", {
+          state: {
+            quiz: currentQuiz,
+            answers: updatedResults,
+          },
+        });
+
+        return;
+      }
+
+      setCurrentQuestion(nextIndex);
+      currentQuestionRef.current = nextIndex;
+
+      setSelectedAnswers([]);
+      selectedAnswersRef.current = [];
+
+      setTimeLeft(currentQuiz.timePerQuestion);
+    };
+
+    socket.on("question-changed", handleQuestionChanged);
+
+    return () => {
+      socket.off("question-changed", handleQuestionChanged);
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!quiz || !isHost) {
       return;
     }
 
     const timer = setInterval(() => {
-
-      setTimeLeft(prev => {
-
-        if (prev <= 1) {
-
-          clearInterval(timer);
-
-          nextQuestion();
-
-          return 0;
-
+      setTimeLeft((previousTime) => {
+        if (previousTime <= 1) {
+          socket.emit("next-question");
+          return quiz.timePerQuestion;
         }
 
-        return prev - 1;
-
+        return previousTime - 1;
       });
-
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [quiz, currentQuestion, isHost]);
 
-  }, [currentQuestion, started]);
+  const question = quiz?.questions?.[currentQuestion];
 
-  if (!quiz) {
+  const handleAnswerClick = (answerId) => {
+    if (!question) {
+      return;
+    }
 
+    if (question.type === "single") {
+      setSelectedAnswers([answerId]);
+      return;
+    }
+
+    setSelectedAnswers((previousAnswers) => {
+      if (previousAnswers.includes(answerId)) {
+        return previousAnswers.filter(
+            (selectedId) => selectedId !== answerId
+        );
+      }
+
+      return [...previousAnswers, answerId];
+    });
+  };
+
+  const goToNextQuestion = () => {
+    if (!isHost) {
+      return;
+    }
+
+    socket.emit("next-question");
+  };
+
+  if (error) {
     return (
-      <div className="page">
-        <div className="card">
-          Загрузка...
-        </div>
-      </div>
-    );
+        <div className="page">
+          <div className="card">
+            <h1>Ошибка</h1>
+            <p>{error}</p>
 
+            <button onClick={() => navigate("/dashboard")}>
+              В личный кабинет
+            </button>
+          </div>
+        </div>
+    );
   }
 
-  if (!started) {
-
+  if (!quiz) {
     return (
-
-      <div className="page">
-
-        <div className="card">
-
-          <h1>{quiz.title}</h1>
-
-          <p>
-            Категория: {quiz.category}
-          </p>
-
-          <p>
-            Правила:
-          </p>
-
-          <p>
-            {quiz.rules || "Правила отсутствуют"}
-          </p>
-
-          <p>
-            Время на вопрос: {quiz.timePerQuestion} сек.
-          </p>
-
-          <p>
-            Количество вопросов: {quiz.questions.length}
-          </p>
-
-          <button
-            onClick={() => {
-
-              setStarted(true);
-              setTimeLeft(quiz.timePerQuestion);
-
-            }}
-          >
-            Начать игру
-          </button>
-
+        <div className="page">
+          <div className="card">
+            Загрузка...
+          </div>
         </div>
-
-      </div>
-
     );
+  }
 
+  if (quiz.questions.length === 0) {
+    return (
+        <div className="page">
+          <div className="card">
+            <h1>{quiz.title}</h1>
+            <p>В этом квизе пока нет вопросов.</p>
+
+            <button onClick={() => navigate("/dashboard")}>
+              В личный кабинет
+            </button>
+          </div>
+        </div>
+    );
+  }
+
+  if (!question) {
+    return (
+        <div className="page">
+          <div className="card">
+            Загрузка вопроса...
+          </div>
+        </div>
+    );
   }
 
   return (
+      <div className="page">
+        <div className="card">
+          <h1>{quiz.title}</h1>
 
-    <div className="page">
+          <p>
+            Вопрос {currentQuestion + 1} из{" "}
+            {quiz.questions.length}
+          </p>
 
-      <div className="card">
+          <p>
+            Осталось времени: {timeLeft} сек.
+          </p>
 
-        <h1>{quiz.title}</h1>
+          <h2>{question.text}</h2>
 
-        <p>
-          Осталось времени: {timeLeft} сек.
-        </p>
+          {question.answers.map((answer) => (
+              <button
+                  key={answer.id}
+                  onClick={() => handleAnswerClick(answer.id)}
+                  style={{
+                    display: "block",
+                    marginBottom: "10px",
+                    backgroundColor: selectedAnswers.includes(answer.id)
+                        ? "#90caf9"
+                        : "",
+                  }}
+              >
+                {answer.text}
+              </button>
+          ))}
 
-        <p>
-          Вопрос {currentQuestion + 1} из {quiz.questions.length}
-        </p>
+          <br />
 
-        <h2>
-          {question.text}
-        </h2>
-
-        {
-          question.answers.map(answer => (
-
-            <button
-              key={answer.id}
-              onClick={() => handleAnswerClick(answer.id)}
-              style={{
-                display: "block",
-                marginBottom: "10px",
-                backgroundColor: selectedAnswers.includes(answer.id)
-                  ? "#90caf9"
-                  : ""
-              }}
-            >
-              {answer.text}
-            </button>
-
-          ))
-        }
-
-        <br />
-
-        <button
-          onClick={nextQuestion}
-          disabled={
-            selectedAnswers.length === 0 &&
-            timeLeft > 0
-          }
-        >
-          {
-            currentQuestion === quiz.questions.length - 1
-              ? "Завершить"
-              : "Далее"
-          }
-        </button>
-
+          {isHost ? (
+              <button onClick={goToNextQuestion}>
+                {currentQuestion === quiz.questions.length - 1
+                    ? "Завершить квиз"
+                    : "Следующий вопрос"}
+              </button>
+          ) : (
+              <p>
+                Выберите ответ и ожидайте следующего вопроса.
+              </p>
+          )}
+        </div>
       </div>
-
-    </div>
-
   );
-
 }
 
 export default Game;
